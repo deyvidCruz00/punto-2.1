@@ -10,7 +10,7 @@ class Tarea:
         self.id = id
         self.prioridad = prioridad  # 'A' (Alta), 'M' (Media), 'B' (Baja)
         self.tiempo_creacion = tiempo_creacion
-        self.tiempo_procesamiento = {'A': 0.05, 'M': 0.1, 'B': 0.15}[prioridad]  # 500ms, 1000ms, 1500ms - MÁS LENTO
+        self.tiempo_procesamiento = {'A': 0.5, 'M': 0.8, 'B': 1.2}[prioridad]  # 500ms, 800ms, 1200ms - AJUSTADO para causar starvation
         
     def __str__(self):
         return f"Tarea[{self.id}]-{self.prioridad}"
@@ -124,8 +124,8 @@ class Producer(threading.Thread):
             print(f"[{self.name}] [{timestamp()}] Produciendo {tarea}")
             self.cola.put(tarea)
             
-            # Pausa entre producciones para simular llegada realista
-            time.sleep(0.2)
+            # Pausa entre producciones - REDUCIDA para generar más carga
+            time.sleep(0.15)
         
         print(f"[{self.name}] [{timestamp()}] Finalizado - {len(self.secuencia_tareas)} tareas producidas")
 
@@ -165,7 +165,7 @@ class Consumer(threading.Thread):
                 
             except Exception as e:
                 print(f"[{self.name}] Error: {e}")
-                time.sleep(0.1)
+                time.sleep(0.05)
         
         self.running = False
         print(f"[{self.name}] [{timestamp()}] Finalizado por timeout ({self.tiempo_limite}s)")
@@ -192,7 +192,7 @@ def main():
         cola, 
         stats, 
         0,
-        "Sistema iniciado - 3 productores (30 tareas específicas) y 2 consumidores - DISEÑADO PARA STARVATION"
+        "Sistema iniciado - 5 productores (~46 tareas) y 2 consumidores lentos - DISEÑADO PARA STARVATION"
     )
     
     # Secuencia específica de 30 tareas según el documento
@@ -203,24 +203,30 @@ def main():
     ]
     
     print(f"\n=== PREDICCION DE STARVATION ===")
-    print("MOMENTO ESPERADO DE STARVATION:")
-    print("- Las tareas B comenzarán a acumularse inmediatamente")
-    print("- A medida que lleguen más tareas A y M, las B nunca serán procesadas")
-    print("- Después de 10 segundos, múltiples tareas B quedarán sin procesar")
+    print("ESCENARIO CONFIGURADO PARA STARVATION:")
+    print("- 5 productores generando ~46 tareas (incluye A, M y B)")
+    print("- 2 consumidores procesando con tiempos: A=500ms, M=800ms, B=1200ms")
+    print("- Política: SIEMPRE priorizar A y M sobre B")
+    print("- En 10 segundos, los consumidores solo procesarán ~12-15 tareas")
+    print("- Las tareas B se acumularán SIN SER PROCESADAS (STARVATION)")
     
     tiempo_inicio = time.time()
     
-    # Crear y iniciar productores - SOLO 3 productores para las 30 tareas específicas
+    # Crear y iniciar productores - 5 productores para generar tareas rápidamente
     producers = []
-    for i in range(3):  # CORREGIDO: Solo 3 productores para 30 tareas exactas
-        secuencia = secuencias[i]
+    for i in range(5):  # 5 productores: 3 con secuencia específica, 2 generan más tareas B/M
+        if i < 3:
+            secuencia = secuencias[i]
+        else:
+            # Productores adicionales generan más tareas A y M para aumentar starvation de B
+            secuencia = ['A','M','A','M','B','A','M','B']  # Más A y M para causar starvation
         producer = Producer(cola, i+1, secuencia)
         producers.append(producer)
         producer.start()
     
-    # Crear y iniciar consumidores - REDUCIDO A 2 para crear cuello de botella
+    # Crear y iniciar consumidores - SOLO 2 para crear cuello de botella severo
     consumers = []
-    for i in range(2):  # CORREGIDO: Solo 2 consumidores en lugar de 3
+    for i in range(2):  # Solo 2 consumidores para procesar ~46 tareas en 10s
         consumer = Consumer(cola, i+1, stats, tiempo_limite=10)
         consumers.append(consumer)
         consumer.start()

@@ -10,7 +10,7 @@ class Tarea:
         self.id = id
         self.prioridad = prioridad  # 'A' (Alta), 'M' (Media), 'B' (Baja)
         self.tiempo_creacion = tiempo_creacion
-        self.tiempo_procesamiento = {'A': 0.05, 'M': 0.1, 'B': 0.15}[prioridad]  # 50ms, 100ms, 150ms
+        self.tiempo_procesamiento = {'A': 0.2, 'M': 0.25, 'B': 0.3}[prioridad]  # 200ms, 250ms, 300ms - Ajustado para ver progreso
         self.edad = 0  # Para el mecanismo de aging
         
     def __str__(self):
@@ -180,13 +180,13 @@ class Producer(threading.Thread):
             print(f"[{self.name}] [{timestamp()}] Produciendo {tarea}")
             self.cola.put(tarea)
             
-            # Pequeña pausa entre producciones
-            time.sleep(0.1)
+            # Pausa muy corta entre producciones para generar carga rápidamente
+            time.sleep(0.05)
         
         print(f"[{self.name}] [{timestamp()}] Finalizado - {len(self.secuencia_tareas)} tareas producidas")
 
 class Consumer(threading.Thread):
-    def __init__(self, cola, consumer_id, stats, tiempo_limite=12):
+    def __init__(self, cola, consumer_id, stats, tiempo_limite=10):
         super().__init__(name=f"Consumer-{consumer_id}")
         self.cola = cola
         self.consumer_id = consumer_id
@@ -278,9 +278,9 @@ def main():
     for i in range(5):
         if i < 3:  # Los primeros 3 productores usan las secuencias específicas
             secuencia = secuencias[i]
-        else:  # Los últimos 2 generan según distribución: 60% B, 30% M, 10% A
+        else:  # Los últimos 2 generan pocas tareas adicionales para ver progreso completo
             secuencia = []
-            for _ in range(6):  # 6 tareas por productor adicional
+            for _ in range(3):  # Solo 3 tareas por productor adicional (total ~36 tareas)
                 rand = random.random()
                 if rand < 0.6:
                     secuencia.append('B')
@@ -293,15 +293,15 @@ def main():
         producers.append(producer)
         producer.start()
     
-    # Crear y iniciar consumidores (tiempo extendido para ver efectos del anti-starvation)
+    # Crear y iniciar consumidores
     consumers = []
     for i in range(3):
-        consumer = Consumer(cola, i+1, stats, tiempo_limite=12)
+        consumer = Consumer(cola, i+1, stats, tiempo_limite=10)
         consumers.append(consumer)
         consumer.start()
     
-    # Monitoreo temporal cada 2 segundos (extendido a 12 segundos)
-    tiempos_monitoreo = [2, 4, 6, 8, 10, 12]
+    # Monitoreo temporal cada 2 segundos hasta 10 segundos
+    tiempos_monitoreo = [2, 4, 6, 8, 10]
     
     for tiempo_objetivo in tiempos_monitoreo:
         # Esperar hasta el tiempo objetivo
@@ -309,10 +309,10 @@ def main():
             time.sleep(0.1)
         
         tiempo_actual = int(time.time() - tiempo_inicio)
-        extra_info = f"Monitoreo con anti-starvation activo"
+        extra_info = f"Monitoreo con anti-starvation activo - Progreso gradual"
         
-        if tiempo_objetivo == 12:
-            extra_info += " - *** VERIFICACIÓN FINAL: TODAS LAS TAREAS PROCESADAS ***"
+        if tiempo_objetivo == 10:
+            extra_info += " - *** VERIFICACIÓN FINAL: MÁXIMO PROGRESO EN 10s ***"
         
         mostrar_estado_screenshot(
             f"MONITOREO A LOS {tiempo_objetivo} SEGUNDOS",
